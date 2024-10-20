@@ -80,28 +80,78 @@ struct TranslationView: View {
     }
 
     func translateText() {
-        // Convert selected languages to appropriate language codes
-        let sourceLanguageCode = languageCode(for: sourceLanguage)
-        let targetLanguageCode = languageCode(for: targetLanguage)
+        // Avoid encoding the text manually
+        let encodedText = textToTranslate
+        
+        // Get the language codes based on user selection
+        let sourceLangCode = languageCode(for: sourceLanguage)
+        let targetLangCode = languageCode(for: targetLanguage)
 
-        let encodedText = textToTranslate.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let apiUrl = "https://api.mymemory.translated.net/get?q=\(encodedText)&langpair=\(sourceLanguageCode)|\(targetLanguageCode)"
+        // Add a timestamp to prevent caching
+        let timestamp = Date().timeIntervalSince1970
 
-        guard let url = URL(string: apiUrl) else { return }
+        // Construct the API URL with machine translation disabled (human translations only)
+        let apiUrl = "https://api.mymemory.translated.net/get?q=\(encodedText)&langpair=\(sourceLangCode)|\(targetLangCode)&mt=0&tm=1&ts=\(timestamp)"
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        // Print the apiUrl for debugging
+        print("API URL: \(apiUrl)")
+
+        guard let url = URL(string: apiUrl) else {
+            print("Invalid API URL.")
+            return
+        }
+
+        // Create a URLRequest and change to POST request with proper body encoding
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let bodyData = "q=\(textToTranslate)&langpair=\(sourceLangCode)|\(targetLangCode)&mt=0&tm=1&ts=\(timestamp)"
+        request.httpBody = bodyData.data(using: .utf8)
+
+        // API call
+        URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("Translation error: \(error.localizedDescription)")
                 return
             }
 
-            if let data = data, let jsonResponse = try? JSONDecoder().decode(MyMemoryResponse.self, from: data) {
-                DispatchQueue.main.async {
-                    translatedText = jsonResponse.responseData.translatedText
-                    translationManager.saveTranslation(original: textToTranslate, translated: translatedText)
+            guard let data = data else {
+                print("No data received from API.")
+                return
+            }
+
+            // Print raw JSON response for debugging
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response: \(jsonString)")
+            }
+
+            // Parse the response data
+            do {
+                let jsonResponse = try JSONDecoder().decode(MyMemoryResponse.self, from: data)
+
+                // Check if the response status is 200 (success)
+                if jsonResponse.responseStatus == 200 {
+                    DispatchQueue.main.async {
+                        var bestTranslation = jsonResponse.responseData.translatedText
+                        
+                        // Check if there are better matches from the "matches" array
+                        if let matches = jsonResponse.matches {
+                            if let highestMatch = matches.max(by: { $0.match < $1.match }) {
+                                bestTranslation = highestMatch.translation
+                            }
+                        }
+
+                        // Update the UI with the best translation
+                        translatedText = bestTranslation
+
+                        // Save the translation to history
+                        translationManager.saveTranslation(original: textToTranslate, translated: translatedText)
+                    }
+                } else {
+                    print("Error in API response: \(jsonResponse.responseDetails)")
                 }
-            } else {
-                print("Failed to decode translation response.")
+            } catch {
+                print("Failed to decode translation response: \(error.localizedDescription)")
             }
         }.resume()
     }
@@ -123,10 +173,19 @@ struct TranslationView: View {
 
 struct MyMemoryResponse: Codable {
     let responseData: TranslationData
+    let responseDetails: String
+    let responseStatus: Int
+    let matches: [TranslationMatch]?
 }
 
 struct TranslationData: Codable {
     let translatedText: String
+}
+
+struct TranslationMatch: Codable {
+    let segment: String
+    let translation: String
+    let match: Double
 }
 
 #Preview {
