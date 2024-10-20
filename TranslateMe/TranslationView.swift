@@ -82,7 +82,7 @@ struct TranslationView: View {
     func translateText() {
         // Avoid encoding the text manually
         let encodedText = textToTranslate
-        
+
         // Get the language codes based on user selection
         let sourceLangCode = languageCode(for: sourceLanguage)
         let targetLangCode = languageCode(for: targetLanguage)
@@ -101,15 +101,8 @@ struct TranslationView: View {
             return
         }
 
-        // Create a URLRequest and change to POST request with proper body encoding
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let bodyData = "q=\(textToTranslate)&langpair=\(sourceLangCode)|\(targetLangCode)&mt=0&tm=1&ts=\(timestamp)"
-        request.httpBody = bodyData.data(using: .utf8)
-
         // API call
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
                 print("Translation error: \(error.localizedDescription)")
                 return
@@ -133,10 +126,12 @@ struct TranslationView: View {
                 if jsonResponse.responseStatus == 200 {
                     DispatchQueue.main.async {
                         var bestTranslation = jsonResponse.responseData.translatedText
-                        
+
                         // Check if there are better matches from the "matches" array
                         if let matches = jsonResponse.matches {
-                            if let highestMatch = matches.max(by: { $0.match < $1.match }) {
+                            // Filter matches to find better quality matches
+                            let goodMatches = matches.filter { $0.match > 0.9 && !$0.translation.contains("Estudio") }
+                            if let highestMatch = goodMatches.max(by: { $0.match < $1.match }) {
                                 bestTranslation = highestMatch.translation
                             }
                         }
