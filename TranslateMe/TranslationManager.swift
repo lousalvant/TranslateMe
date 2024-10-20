@@ -55,7 +55,6 @@ class TranslationManager: ObservableObject {
                 return
             }
 
-            // Delete each document
             snapshot?.documents.forEach { document in
                 self.db.collection("translations").document(document.documentID).delete { error in
                     if let error = error {

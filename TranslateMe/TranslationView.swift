@@ -11,6 +11,7 @@ import FirebaseFirestore
 struct TranslationView: View {
     @State private var textToTranslate: String = ""
     @State private var translatedText: String = ""
+    @State private var isTranslating = false
     @ObservedObject var translationManager = TranslationManager()
 
     // Default languages
@@ -21,63 +22,117 @@ struct TranslationView: View {
     let languages = ["English", "Spanish", "French", "German", "Chinese", "Japanese", "Italian"]
 
     var body: some View {
-        VStack {
-            TextField("Enter text to translate", text: $textToTranslate)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
+            ZStack {
+                // Gradient background
+                LinearGradient(gradient: Gradient(colors: [Color.blue, Color.purple]), startPoint: .top, endPoint: .bottom)
+                    .edgesIgnoringSafeArea(.all)
+                
+                VStack(spacing: 20) {
+                    Text("TranslateMe")
+                        .font(.largeTitle)
+                        .foregroundColor(.white)
+                        .padding()
 
-            // Source Language Picker
-            Picker("Source Language", selection: $sourceLanguage) {
-                ForEach(languages, id: \.self) {
-                    Text($0)
-                }
-            }
-            .pickerStyle(MenuPickerStyle())
-            .padding()
+                    // TextField for entering the text to translate
+                    TextField("Enter text to translate", text: $textToTranslate)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding()
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(10)
+                        .shadow(radius: 5)
+                        .padding(.horizontal)
 
-            // Target Language Picker
-            Picker("Target Language", selection: $targetLanguage) {
-                ForEach(languages, id: \.self) {
-                    Text($0)
-                }
-            }
-            .pickerStyle(MenuPickerStyle())
-            .padding()
-
-            Button("Translate") {
-                translateText()
-            }
-            .padding()
-
-            Text(translatedText)
-                .padding()
-
-            // ScrollViewReader for automatic scrolling
-            ScrollViewReader { scrollViewProxy in
-                List(translationManager.history, id: \.self) { historyItem in
-                    Text(historyItem)
-                        .id(historyItem) // Assign a unique ID to each item for scrolling
-                }
-                .onChange(of: translationManager.history) { oldHistory, newHistory in
-                    // Scroll to the last item when history changes
-                    if let lastItem = newHistory.last {
-                        withAnimation {
-                            scrollViewProxy.scrollTo(lastItem, anchor: .bottom)
+                    // Source Language Picker
+                    Picker("Source Language", selection: $sourceLanguage) {
+                        ForEach(languages, id: \.self) {
+                            Text($0)
                         }
                     }
-                }
-            }
+                    .pickerStyle(MenuPickerStyle())
+                    .padding()
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+                    .padding(.horizontal)
 
-            Button("Clear History") {
-                translationManager.clearHistory()
+                    // Target Language Picker
+                    Picker("Target Language", selection: $targetLanguage) {
+                        ForEach(languages, id: \.self) {
+                            Text($0)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .padding()
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+                    .padding(.horizontal)
+
+                    // Translate Button or ProgressView based on isTranslating state
+                    if isTranslating {
+                        ProgressView("Translating...")
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .padding()
+                    } else {
+                        Button(action: {
+                            isTranslating = true
+                            translateText()
+                        }) {
+                            Text("Translate")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(width: 200)
+                                .background(LinearGradient(gradient: Gradient(colors: [Color.blue, Color.purple]), startPoint: .leading, endPoint: .trailing))
+                                .cornerRadius(10)
+                                .shadow(radius: 10)
+                        }
+                        .padding(.top, 10)
+                    }
+
+                    // Display translated text
+                    Text(translatedText)
+                        .font(.title2)
+                        .padding()
+                        .foregroundColor(.white)
+                        .opacity(translatedText.isEmpty ? 0 : 1)
+                        .animation(.easeIn, value: translatedText)  // Specify the value being animated
+
+                    // ScrollViewReader for translation history
+                    ScrollViewReader { scrollViewProxy in
+                        List(translationManager.history, id: \.self) { historyItem in
+                            Text(historyItem)
+                                .padding()
+                                .background(Color.white.opacity(0.2))
+                                .cornerRadius(10)
+                                .shadow(radius: 5)
+                        }
+                        .onChange(of: translationManager.history) { _, newHistory in
+                            if let lastItem = newHistory.last {
+                                withAnimation {
+                                    scrollViewProxy.scrollTo(lastItem, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .padding()
+                        .frame(height: 200)
+                    }
+
+                    // Clear History Button
+                    Button("Clear History") {
+                        translationManager.clearHistory()
+                    }
+                    .padding()
+                    .foregroundColor(.white)
+                    .background(Color.red)
+                    .cornerRadius(10)
+                }
+                .padding()
             }
-            .padding()
+            .onAppear {
+                translationManager.loadHistory() // Load history on app start
+            }
         }
-        .onAppear {
-            translationManager.loadHistory() // Load history on app start
-        }
-        .padding()
-    }
 
     func translateText() {
         // Avoid encoding the text manually
@@ -98,6 +153,7 @@ struct TranslationView: View {
 
         guard let url = URL(string: apiUrl) else {
             print("Invalid API URL.")
+            isTranslating = false // Stop the loading animation
             return
         }
 
@@ -105,11 +161,17 @@ struct TranslationView: View {
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
                 print("Translation error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    isTranslating = false // Stop the loading animation on error
+                }
                 return
             }
 
             guard let data = data else {
                 print("No data received from API.")
+                DispatchQueue.main.async {
+                    isTranslating = false // Stop the loading animation if no data is received
+                }
                 return
             }
 
@@ -141,12 +203,21 @@ struct TranslationView: View {
 
                         // Save the translation to history
                         translationManager.saveTranslation(original: textToTranslate, translated: translatedText)
+
+                        // Stop the loading animation
+                        isTranslating = false
                     }
                 } else {
                     print("Error in API response: \(jsonResponse.responseDetails)")
+                    DispatchQueue.main.async {
+                        isTranslating = false // Stop the loading animation if response is not successful
+                    }
                 }
             } catch {
                 print("Failed to decode translation response: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    isTranslating = false // Stop the loading animation if decoding fails
+                }
             }
         }.resume()
     }
