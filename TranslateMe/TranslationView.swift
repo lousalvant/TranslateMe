@@ -52,7 +52,7 @@ struct TranslationView: View {
                         }
                     }
                     .frame(width: 120, height: 40) // Make the picker smaller
-                    .background(Color.white.opacity(0.2))
+                    .background(Color.white.opacity(0.7))
                     .cornerRadius(10)
                     .shadow(radius: 5)
 
@@ -69,7 +69,7 @@ struct TranslationView: View {
                         }
                     }
                     .frame(width: 120, height: 40) // Make the picker smaller
-                    .background(Color.white.opacity(0.2))
+                    .background(Color.white.opacity(0.7))
                     .cornerRadius(10)
                     .shadow(radius: 5)
                 }
