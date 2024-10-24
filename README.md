@@ -28,6 +28,12 @@ The following **additional** features are implemented:
 
 ![GIF](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaHQyMXRobXFlMnRvY3g3Z2diMjVvemkxcGswdHRheGFueTc2YWN5cyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/z6MrdQfrZhQfyPKpLi/giphy.gif)
 
+
+**brainstorming2_lousalvant.md**
+
+
+![Alt text](https://i.imgur.com/udvSAfN.png)
+
 ## Notes
 
 I faced challenges with inconsistent API responses, text encoding issues, and ensuring accurate translations. I also improved the UI for better readability and managed the translation state to display the progress view correctly. Additionally, I filtered translation matches to present the most accurate results to the user.
